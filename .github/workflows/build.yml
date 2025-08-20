@@ -1,8 +1,8 @@
-name: Weekly Hamlib Check & Release
+name: Weekly Hamlib Release Check and Build
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 0 * * 0'
   workflow_dispatch: # manual
 
 permissions:
@@ -99,11 +99,11 @@ jobs:
 
       - name: Set up environment for ${{ matrix.arch }}
         uses: addnab/docker-run-action@v3
+        env: 
+          TAG: ${{ needs.check-new-release.outputs.new_tag }}
         with:
           image: debian:9
-          options: -v /tmp:/tmp
-          env: |
-            TAG: ${{ needs.check-new-release.outputs.new_tag }}
+          options: -v /tmp:/tmp --env TAG=${{ needs.check-new-release.outputs.new_tag }}
           run: |
             cat << EOF | tee /etc/apt/sources.list
             deb http://archive.debian.org/debian/ stretch main contrib non-free
@@ -136,15 +136,16 @@ jobs:
 
             cd /tmp/dist-${{ matrix.arch }}
             chmod +x bin/*
-            zip -r Hamlib-linux-${{ matrix.arch }}-$TAG.zip *
+            zip -r hamlib-linux-${{ matrix.arch }}-$TAG.zip *
 
+            
             echo "========DONE FOR ${{ matrix.arch }}"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Hamlib-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}
-          path: /tmp/dist-${{ matrix.arch }}/Hamlib-linux-${{ matrix.arch }}-$TAG.zip
+          path: /tmp/dist-${{ matrix.arch }}/hamlib-linux-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}.zip
 
   create-release:
     needs: [check-new-release, build-multi-arch]
