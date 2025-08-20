@@ -1,0 +1,179 @@
+name: Weekly Hamlib Release Check and Build
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch: # manual
+
+permissions:
+  contents: write
+
+jobs:
+  check-new-release:
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.check-release.outputs.new_tag }}
+      should_build: ${{ steps.check-release.outputs.should_build }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Get current latest tag from releases
+        id: get-current-tag
+        run: |
+          LATEST_RELEASE=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name // ""')
+          if [ -n "$LATEST_RELEASE" ]; then
+            echo "current_tag=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          else
+            echo "current_tag=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get latest Hamlib tag
+        id: get-hamlib-tag
+        run: |
+          LATEST_HAMLIB_TAG=$(curl -s https://api.github.com/repos/hamlib/hamlib/releases/latest | jq -r '.tag_name')
+          echo "hamlib_tag=$LATEST_HAMLIB_TAG" >> $GITHUB_OUTPUT
+          echo "Latest Hamlib tag: $LATEST_HAMLIB_TAG"
+
+      - name: Check if new release available
+        id: check-release
+        run: |
+          CURRENT_TAG="${{ steps.get-current-tag.outputs.current_tag }}"
+          HAMLIB_TAG="${{ steps.get-hamlib-tag.outputs.hamlib_tag }}"
+          
+          echo "Current tag: $CURRENT_TAG"
+          echo "Hamlib tag: $HAMLIB_TAG"
+          
+          if [ -z "$CURRENT_TAG" ] || [ "$HAMLIB_TAG" != "$CURRENT_TAG" ]; then
+            echo "New release found: $HAMLIB_TAG"
+            echo "new_tag=$HAMLIB_TAG" >> $GITHUB_OUTPUT
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "No new release available"
+            echo "new_tag=" >> $GITHUB_OUTPUT
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-multi-arch:
+    needs: check-new-release
+    if: needs.check-new-release.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, i386, armhf, arm64]
+        include:
+          - arch: amd64
+            host: x86_64-linux-gnu
+            pkgcfg: x86_64-linux-gnu
+            dpkg_arch: amd64
+            cross_toolchain: ""
+            cflags: "-g -O2 -fPIC -fdata-sections -ffunction-sections"
+            ldflags: "-Wl,--gc-sections"
+          - arch: i386
+            host: i686-linux-gnu
+            pkgcfg: i386-linux-gnu
+            dpkg_arch: i386
+            cross_toolchain: "gcc-multilib g++-multilib"
+            cflags: "-m32 -g -O2 -fPIC -fdata-sections -ffunction-sections"
+            ldflags: "-m32 -Wl,--gc-sections"
+          - arch: armhf
+            host: arm-linux-gnueabihf
+            pkgcfg: arm-linux-gnueabihf
+            dpkg_arch: armhf
+            cross_toolchain: "crossbuild-essential-armhf"
+            cflags: "-g -O2 -fPIC -fdata-sections -ffunction-sections"
+            ldflags: "-Wl,--gc-sections"
+          - arch: arm64
+            host: aarch64-linux-gnu
+            pkgcfg: aarch64-linux-gnu
+            dpkg_arch: arm64
+            cross_toolchain: "crossbuild-essential-arm64"
+            cflags: "-g -O2 -fPIC -fdata-sections -ffunction-sections"
+            ldflags: "-Wl,--gc-sections"
+
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v4
+
+      - name: Set up environment for ${{ matrix.arch }}
+        uses: addnab/docker-run-action@v3
+        with:
+          image: debian:9
+          options: -v /tmp:/tmp
+          env: |
+            TAG: ${{ needs.check-new-release.outputs.new_tag }}
+          run: |
+            cat << EOF | tee /etc/apt/sources.list
+            deb http://archive.debian.org/debian/ stretch main contrib non-free
+            deb-src http://archive.debian.org/debian/ stretch main contrib non-free
+            deb http://archive.debian.org/debian-security/ stretch/updates main contrib non-free
+            deb-src http://archive.debian.org/debian-security/ stretch/updates main contrib non-free
+            deb http://archive.debian.org/debian/ stretch-backports main contrib non-free
+            EOF
+            
+            dpkg --add-architecture ${{ matrix.dpkg_arch }}
+            apt update
+            
+            apt install -y git autoconf automake libtool build-essential gcc g++ cmake make zip\
+              libusb-dev:${{ matrix.dpkg_arch }} libudev-dev:${{ matrix.dpkg_arch }} \
+              ${{ matrix.cross_toolchain }}
+            
+            git clone "https://github.com/hamlib/hamlib.git" /tmp/source-code
+
+            cd /tmp/source-code
+            git checkout "tags/$TAG"
+
+            echo "=====START BUILDING FOR ${{ matrix.arch }}"
+            mkdir /tmp/dist-${{ matrix.arch }}
+            ./bootstrap
+
+            ./configure --prefix=/tmp/dist-${{ matrix.arch }} --host=${{ matrix.host }} --disable-shared --enable-static --without-cxx-binding  CFLAGS="${{ matrix.cflags }}" CXXFLAGS="${{ matrix.cflags }}" LDFLAGS="${{ matrix.ldflags }}" PKG_CONFIG_PATH="/usr/lib/${{ matrix.pkgcfg }}/pkgconfig"
+
+            make -j$(nproc) all
+            make install-strip DESTDIR=""
+
+            cd /tmp/dist-${{ matrix.arch }}
+            chmod +x bin/*
+            zip -r Hamlib-linux-${{ matrix.arch }}-$TAG.zip *
+
+            echo "========DONE FOR ${{ matrix.arch }}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hamlib-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}
+          path: /tmp/dist-${{ matrix.arch }}/Hamlib-linux-${{ matrix.arch }}-$TAG.zip
+
+  create-release:
+    needs: [check-new-release, build-multi-arch]
+    if: needs.check-new-release.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          
+      - name: List downloaded artifacts
+        run: ls -la ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check-new-release.outputs.new_tag }}
+          release_name: Hamlib ${{ needs.check-new-release.outputs.new_tag }}
+          body: |
+            Automated multi-architecture linux build of Hamlib ${{ needs.check-new-release.outputs.new_tag }}
+            
+            Built on: ${{ github.workflow }} @ ${{ github.sha }}
+            
+            Architectures:
+            - amd64 (x86_64)
+            - i386 (x86)
+            - armhf (ARMv7)
+            - arm64 (ARM64)
+          files: |
+            ./artifacts/**/*.zip
