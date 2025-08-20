@@ -1,8 +1,8 @@
-name: Weekly Hamlib Release Check and Build
+name: Daily Hamlib Release Check and Build
 
 on:
   schedule:
-    - cron: '0 0 * * 0'
+    - cron: '0 2 * * *'
   workflow_dispatch: # manual
 
 permissions:
@@ -136,16 +136,16 @@ jobs:
 
             cd /tmp/dist-${{ matrix.arch }}
             chmod +x bin/*
-            zip -r hamlib-linux-${{ matrix.arch }}-$TAG.zip *
+            zip -r Hamlib-linux-${{ matrix.arch }}-$TAG.zip *
 
-            
+
             echo "========DONE FOR ${{ matrix.arch }}"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Hamlib-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}
-          path: /tmp/dist-${{ matrix.arch }}/hamlib-linux-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}.zip
+          path: /tmp/dist-${{ matrix.arch }}/Hamlib-linux-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}.zip
 
   create-release:
     needs: [check-new-release, build-multi-arch]
