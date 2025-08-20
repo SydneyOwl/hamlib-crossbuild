@@ -1,4 +1,4 @@
-name: Weekly Hamlib Release Check and Build
+name: Weekly Hamlib Check & Release
 
 on:
   schedule:
