@@ -18,5 +18,7 @@ The build scripts and automation code in this repository are Unlicensed(The Unli
 ## Disclaimer
 This repository is not affiliated with official Hamlib project. It aims to provides convenience builds for users who require pre-compiled binaries across multiple architectures.
 
+These compilation artifacts **are experimental** and may not work at all or function improperly on certain platforms. Use at your own risk!
+
 ## Misc
 PRs and issues are welcomed!
