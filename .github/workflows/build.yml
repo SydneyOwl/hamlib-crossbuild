@@ -45,7 +45,7 @@ jobs:
           echo "Current tag: $CURRENT_TAG"
           echo "Hamlib tag: $HAMLIB_TAG"
           
-          if [ -z "$CURRENT_TAG" ] || [ "$HAMLIB_TAG" != "$CURRENT_TAG" ]; then
+          if [ -n "$HAMLIB_TAG" ] && [ "$HAMLIB_TAG" != "null" ] && { [ -z "$CURRENT_TAG" ] || [ "$HAMLIB_TAG" != "$CURRENT_TAG" ]; }; then
             echo "New release found: $HAMLIB_TAG"
             echo "new_tag=$HAMLIB_TAG" >> $GITHUB_OUTPUT
             echo "should_build=true" >> $GITHUB_OUTPUT
