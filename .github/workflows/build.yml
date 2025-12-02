@@ -55,7 +55,7 @@ jobs:
             echo "should_build=false" >> $GITHUB_OUTPUT
           fi
 
-  build-multi-arch:
+  build-linux-multi-arch:
     needs: check-new-release
     if: needs.check-new-release.outputs.should_build == 'true'
     runs-on: ubuntu-latest
@@ -126,15 +126,15 @@ jobs:
             git checkout "tags/$TAG"
 
             echo "=====START BUILDING FOR ${{ matrix.arch }}"
-            mkdir /tmp/dist-${{ matrix.arch }}
+            mkdir /tmp/dist-linux-${{ matrix.arch }}
             ./bootstrap
 
-            ./configure --prefix=/tmp/dist-${{ matrix.arch }} --host=${{ matrix.host }} --disable-shared --enable-static --without-cxx-binding  CFLAGS="${{ matrix.cflags }}" CXXFLAGS="${{ matrix.cflags }}" LDFLAGS="${{ matrix.ldflags }}" PKG_CONFIG_PATH="/usr/lib/${{ matrix.pkgcfg }}/pkgconfig"
+            ./configure --prefix=/tmp/dist-linux-${{ matrix.arch }} --host=${{ matrix.host }} --disable-shared --enable-static --without-cxx-binding  CFLAGS="${{ matrix.cflags }}" CXXFLAGS="${{ matrix.cflags }}" LDFLAGS="${{ matrix.ldflags }}" PKG_CONFIG_PATH="/usr/lib/${{ matrix.pkgcfg }}/pkgconfig"
 
             make -j$(nproc) all
             make install-strip DESTDIR=""
 
-            cd /tmp/dist-${{ matrix.arch }}
+            cd /tmp/dist-linux-${{ matrix.arch }}
             chmod +x bin/*
             zip -r Hamlib-linux-${{ matrix.arch }}-$TAG.zip *
 
@@ -144,11 +144,94 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Hamlib-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}
-          path: /tmp/dist-${{ matrix.arch }}/Hamlib-linux-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}.zip
+          name: Hamlib-linux-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}
+          path: /tmp/dist-linux-${{ matrix.arch }}/Hamlib-linux-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}.zip
+
+  build-macos-multi-arch:
+    needs: check-new-release
+    if: needs.check-new-release.outputs.should_build == 'true'
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, arm64]
+        include:
+          - arch: x86_64
+            target: x86_64-apple-darwin
+            sdk: macosx
+            deployment_target: "10.13"
+          - arch: arm64
+            target: arm64-apple-darwin
+            sdk: macosx
+            deployment_target: "11.0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install automake autoconf libtool pkg-config cmake
+          brew install libusb libusb-compat
+          brew install libomp
+
+      - name: Clone Hamlib source
+        env:
+          TAG: ${{ needs.check-new-release.outputs.new_tag }}
+        run: |
+          git clone "https://github.com/hamlib/hamlib.git" /tmp/hamlib-source
+          cd /tmp/hamlib-source
+          git checkout "tags/$TAG"
+
+      - name: Build for ${{ matrix.arch }}
+        env:
+          TAG: ${{ needs.check-new-release.outputs.new_tag }}
+          ARCH: ${{ matrix.arch }}
+          TARGET: ${{ matrix.target }}
+          SDK: ${{ matrix.sdk }}
+          DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
+        run: |
+          echo "=====START BUILDING FOR macOS $ARCH"
+          
+          # Create build directory
+          mkdir -p /tmp/build-macos-$ARCH
+          mkdir -p /tmp/dist-macos-$ARCH
+          
+          cd /tmp/hamlib-source
+          
+          # Bootstrap
+          ./bootstrap
+          
+          # Configure for macOS
+          ./configure \
+            --prefix=/tmp/dist-macos-$ARCH \
+            --host=$TARGET \
+            --disable-shared \
+            --enable-static \
+            --without-cxx-binding \
+            CFLAGS="-arch $ARCH -mmacosx-version-min=$DEPLOYMENT_TARGET -g -O2 -fPIC" \
+            CXXFLAGS="-arch $ARCH -mmacosx-version-min=$DEPLOYMENT_TARGET -g -O2 -fPIC" \
+            LDFLAGS="-arch $ARCH -mmacosx-version-min=$DEPLOYMENT_TARGET"
+          
+          # Build and install
+          make -j$(sysctl -n hw.ncpu) all
+          make install-strip DESTDIR=""
+          
+          # Package
+          cd /tmp/dist-macos-$ARCH
+          chmod +x bin/*
+          zip -r Hamlib-macos-$ARCH-$TAG.zip *
+          
+          echo "=====DONE BUILDING FOR macOS $ARCH"
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hamlib-macos-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}
+          path: /tmp/dist-macos-${{ matrix.arch }}/Hamlib-macos-${{ matrix.arch }}-${{ needs.check-new-release.outputs.new_tag }}.zip
 
   create-release:
-    needs: [check-new-release, build-multi-arch]
+    needs: [check-new-release, build-linux-multi-arch, build-macos-multi-arch]
     if: needs.check-new-release.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     
@@ -167,14 +250,18 @@ jobs:
           tag_name: ${{ needs.check-new-release.outputs.new_tag }}
           release_name: Hamlib ${{ needs.check-new-release.outputs.new_tag }}
           body: |
-            Automated multi-architecture linux build of Hamlib ${{ needs.check-new-release.outputs.new_tag }}
+            Automated multi-architecture builds of Hamlib ${{ needs.check-new-release.outputs.new_tag }}
             
             Built on: ${{ github.workflow }} @ ${{ github.sha }}
             
-            Architectures:
+            ## Linux Architectures:
             - amd64 (x86_64)
             - i386 (x86)
             - armhf (ARMv7)
             - arm64 (ARM64)
+            
+            ## macOS Architectures:
+            - x86_64 (Intel)
+            - arm64 (Apple Silicon)
           files: |
             ./artifacts/**/*.zip
