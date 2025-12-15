@@ -1,6 +1,6 @@
 # Readme
 
-This repository provides automated cross-compilation of [Hamlib](https://github.com/hamlib/hamlib) for various CPU architectures(for now linux only). It checks official Hamlib releases everyday and automatically builds linux binary distributions when new versions are detected.
+This repository provides automated cross-compilation of [Hamlib](https://github.com/hamlib/hamlib) for various CPU architectures(for now linux and macOS only). It checks official Hamlib releases everyday and automatically builds linux binary distributions when new versions are detected.
 
 ## Usage
 Pre-built Linux binaries are available in `Releases` section. Download the appropriate archive for your architecture and extract the contents to your target Linux system.
