@@ -98,48 +98,39 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up environment for ${{ matrix.arch }}
-        uses: addnab/docker-run-action@v3
-        env: 
-          TAG: ${{ needs.check-new-release.outputs.new_tag }}
-        with:
-          image: debian:9
-          options: -v /tmp:/tmp --env TAG=${{ needs.check-new-release.outputs.new_tag }}
-          run: |
-            cat << EOF | tee /etc/apt/sources.list
-            deb http://archive.debian.org/debian/ stretch main contrib non-free
-            deb-src http://archive.debian.org/debian/ stretch main contrib non-free
-            deb http://archive.debian.org/debian-security/ stretch/updates main contrib non-free
-            deb-src http://archive.debian.org/debian-security/ stretch/updates main contrib non-free
-            deb http://archive.debian.org/debian/ stretch-backports main contrib non-free
-            EOF
-            
-            dpkg --add-architecture ${{ matrix.dpkg_arch }}
-            apt update
-            
-            apt install -y git autoconf automake libtool build-essential gcc g++ cmake make zip\
-              libusb-dev:${{ matrix.dpkg_arch }} libudev-dev:${{ matrix.dpkg_arch }} \
-              ${{ matrix.cross_toolchain }}
-            
-            git clone "https://github.com/hamlib/hamlib.git" /tmp/source-code
+        run: |
+          docker run --rm  -v /tmp:/tmp --env TAG=${{ needs.check-new-release.outputs.new_tag }} \
+          --entrypoint=bash \
+          debian:11 -c '
+          
+          dpkg --add-architecture ${{ matrix.dpkg_arch }}
+          apt update
 
-            cd /tmp/source-code
-            git checkout "tags/$TAG"
+          apt install -y git autoconf automake libtool build-essential gcc g++ cmake make zip pkg-config \
+            libusb-dev:${{ matrix.dpkg_arch }} libudev-dev:${{ matrix.dpkg_arch }} \
+            ${{ matrix.cross_toolchain }}
+          
+          git clone "https://github.com/hamlib/hamlib.git" /tmp/source-code
 
-            echo "=====START BUILDING FOR ${{ matrix.arch }}"
-            mkdir /tmp/dist-linux-${{ matrix.arch }}
-            ./bootstrap
+          cd /tmp/source-code
+          git checkout "tags/$TAG"
 
-            ./configure --prefix=/tmp/dist-linux-${{ matrix.arch }} --host=${{ matrix.host }} --disable-shared --enable-static --without-cxx-binding  CFLAGS="${{ matrix.cflags }}" CXXFLAGS="${{ matrix.cflags }}" LDFLAGS="${{ matrix.ldflags }}" PKG_CONFIG_PATH="/usr/lib/${{ matrix.pkgcfg }}/pkgconfig"
+          echo "=====START BUILDING FOR ${{ matrix.arch }}"
+          mkdir /tmp/dist-linux-${{ matrix.arch }}
+          ./bootstrap
 
-            make -j$(nproc) all
-            make install-strip DESTDIR=""
+          ./configure --prefix=/tmp/dist-linux-${{ matrix.arch }} --host=${{ matrix.host }} --disable-shared --enable-static --without-cxx-binding  CFLAGS="${{ matrix.cflags }}" CXXFLAGS="${{ matrix.cflags }}" LDFLAGS="${{ matrix.ldflags }}" PKG_CONFIG_PATH="/usr/lib/${{ matrix.pkgcfg }}/pkgconfig"
 
-            cd /tmp/dist-linux-${{ matrix.arch }}
-            chmod +x bin/*
-            zip -r Hamlib-linux-${{ matrix.arch }}-$TAG.zip *
+          make -j$(nproc) all
+          make install-strip DESTDIR=""
+
+          cd /tmp/dist-linux-${{ matrix.arch }}
+          chmod +x bin/*
+          zip -r Hamlib-linux-${{ matrix.arch }}-$TAG.zip *
 
 
-            echo "========DONE FOR ${{ matrix.arch }}"
+          echo "========DONE FOR ${{ matrix.arch }}"
+          '
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
