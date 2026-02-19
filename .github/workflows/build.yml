@@ -141,19 +141,18 @@ jobs:
   build-macos-multi-arch:
     needs: check-new-release
     if: needs.check-new-release.outputs.should_build == 'true'
-    runs-on: macos-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, arm64]
         include:
           - arch: x86_64
+            runner: macos-15-large
             target: x86_64-apple-darwin
-            sdk: macosx
             deployment_target: "10.13"
           - arch: arm64
+            runner: macos-15
             target: arm64-apple-darwin
-            sdk: macosx
             deployment_target: "11.0"
 
     steps:
@@ -179,7 +178,6 @@ jobs:
           TAG: ${{ needs.check-new-release.outputs.new_tag }}
           ARCH: ${{ matrix.arch }}
           TARGET: ${{ matrix.target }}
-          SDK: ${{ matrix.sdk }}
           DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
         run: |
           echo "=====START BUILDING FOR macOS $ARCH"
