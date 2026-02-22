@@ -6,7 +6,10 @@ This repository provides automated cross-compilation of [Hamlib](https://github.
 Pre-built Linux binaries are available in `Releases` section. Download the appropriate archive for your architecture and extract the contents to your target Linux system.
 
 ## Some details..
-Linux binaries are built within an isolated Docker environment utilizing the Debian 11 (Bullseye) base image. Debian 9 ships with GLIBC 2.31.
+Linux binaries are built within an isolated Docker environment utilizing the Debian 9 (Stretch) base image.
+Debian 9 ships with GLIBC 2.24, ensuring compatibility with the vast majority of current Linux distributions. 
+This version represents a conservative baseline that maximizes backward compatibility. Newer GLIBC versions maintain backward compatibility, 
+but older versions cannot run binaries built against newer GLIBC.
 
 macOS binaries are built using macOS 15.
 
