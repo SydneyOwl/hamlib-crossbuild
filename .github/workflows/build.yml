@@ -101,25 +101,40 @@ jobs:
         run: |
           docker run --rm  -v /tmp:/tmp --env TAG=${{ needs.check-new-release.outputs.new_tag }} \
           --entrypoint=bash \
-          debian:11 -c '
+          debian:9 -c '
           
+          cat << EOF | tee /etc/apt/sources.list
+          deb http://archive.debian.org/debian/ stretch main contrib non-free
+          deb-src http://archive.debian.org/debian/ stretch main contrib non-free
+          deb http://archive.debian.org/debian-security/ stretch/updates main contrib non-free
+          deb-src http://archive.debian.org/debian-security/ stretch/updates main contrib non-free
+          deb http://archive.debian.org/debian/ stretch-backports main contrib non-free
+          EOF
+  
           dpkg --add-architecture ${{ matrix.dpkg_arch }}
           apt update
 
-          apt install -y git autoconf automake libtool build-essential gcc g++ cmake make zip pkg-config \
+          apt install -y git autoconf automake libtool build-essential gcc g++ cmake make zip wget \
             libusb-dev:${{ matrix.dpkg_arch }} libudev-dev:${{ matrix.dpkg_arch }} \
             ${{ matrix.cross_toolchain }}
+  
+          cd /tmp
+          wget https://pkg-config.freedesktop.org/releases/pkg-config-0.29.2.tar.gz
+          tar -xzf pkg-config-0.29.2.tar.gz
+          cd pkg-config-0.29.2
+          ./configure --with-internal-glib
+          make
+          make install
           
-          git clone "https://github.com/hamlib/hamlib.git" /tmp/source-code
-
-          cd /tmp/source-code
-          git checkout "tags/$TAG"
+          cd /tmp
+          wget "https://github.com/Hamlib/Hamlib/releases/download/$TAG/hamlib-$TAG.tar.gz"
+          tar -xzf hamlib-$TAG.tar.gz
+          cd hamlib-$TAG
 
           echo "=====START BUILDING FOR ${{ matrix.arch }}"
           mkdir /tmp/dist-linux-${{ matrix.arch }}
-          ./bootstrap
 
-          ./configure --prefix=/tmp/dist-linux-${{ matrix.arch }} --host=${{ matrix.host }} --disable-shared --enable-static --without-cxx-binding  CFLAGS="${{ matrix.cflags }}" CXXFLAGS="${{ matrix.cflags }}" LDFLAGS="${{ matrix.ldflags }}" PKG_CONFIG_PATH="/usr/lib/${{ matrix.pkgcfg }}/pkgconfig"
+          ./configure --prefix=/tmp/dist-linux-${{ matrix.arch }} --host=${{ matrix.host }} --disable-shared --enable-static --without-cxx-binding  CFLAGS="${{ matrix.cflags }}" CXXFLAGS="${{ matrix.cflags }}" LDFLAGS="${{ matrix.ldflags }}" PKG_CONFIG_PATH="/usr/local/bin/pkg-config"
 
           make -j$(nproc) all
           make install-strip DESTDIR=""
