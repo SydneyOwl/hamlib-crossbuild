@@ -195,8 +195,7 @@ jobs:
         run: |
           echo "=====START BUILDING FOR macOS $ARCH"
 
-          libusb_path=$(brew list libusb | grep libusb-1.0.a | head -1)
-          
+          libusb_path=$(brew list libusb | grep libusb-1.0.0.dylib)
           echo $libusb_path
           
           # Create build directory
@@ -211,7 +210,10 @@ jobs:
           # Configure for macOS
           ./configure \
             --prefix=/tmp/dist-macos-$ARCH \
-            --host=$TARGET
+            --host=$TARGET \
+            --disable-shared \
+            --enable-static \
+            --without-cxx-binding
           
           # Build and install
           make -j$(sysctl -n hw.ncpu) all
@@ -219,6 +221,18 @@ jobs:
           
           # Package
           cd /tmp/dist-macos-$ARCH
+          cp libusb_path bin
+          
+          for file in *; do
+            if [ -f "$file" ] && [ -x "$file" ]; then
+              if otool -L "$file" 2>/dev/null | grep -q "libusb-1.0.0.dylib"; then
+                echo "修改 $file ..."
+                install_name_tool -change "/usr/local/opt/libusb/lib/libusb-1.0.0.dylib" \
+                "@executable_path/libusb-1.0.0.dylib" "$file"
+              fi
+            fi
+          done
+          
           chmod +x bin/*
           zip -r Hamlib-macos-$ARCH-$TAG.zip *
           
