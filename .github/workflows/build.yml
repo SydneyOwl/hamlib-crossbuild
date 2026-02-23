@@ -134,7 +134,7 @@ jobs:
           echo "=====START BUILDING FOR ${{ matrix.arch }}"
           mkdir /tmp/dist-linux-${{ matrix.arch }}
 
-          ./configure --prefix=/tmp/dist-linux-${{ matrix.arch }} --host=${{ matrix.host }} --disable-shared --enable-static --without-cxx-binding  CFLAGS="${{ matrix.cflags }}" CXXFLAGS="${{ matrix.cflags }}" LDFLAGS="${{ matrix.ldflags }}" PKG_CONFIG_PATH="/usr/local/bin/pkg-config"
+          ./configure --prefix=/tmp/dist-linux-${{ matrix.arch }} --host=${{ matrix.host }} --disable-shared --enable-static --without-cxx-binding  CFLAGS="${{ matrix.cflags }}" LDFLAGS="${{ matrix.ldflags }}" PKG_CONFIG_PATH="/usr/local/bin/pkg-config"
 
           make -j$(nproc) all
           make install-strip DESTDIR=""
@@ -212,10 +212,7 @@ jobs:
             --host=$TARGET \
             --disable-shared \
             --enable-static \
-            --without-cxx-binding \
-            CFLAGS="-arch $ARCH -mmacosx-version-min=$DEPLOYMENT_TARGET -g -O2 -fPIC" \
-            CXXFLAGS="-arch $ARCH -mmacosx-version-min=$DEPLOYMENT_TARGET -g -O2 -fPIC" \
-            LDFLAGS="-arch $ARCH -mmacosx-version-min=$DEPLOYMENT_TARGET"
+            --without-cxx-binding
           
           # Build and install
           make -j$(sysctl -n hw.ncpu) all
