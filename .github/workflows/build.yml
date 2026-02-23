@@ -223,7 +223,7 @@ jobs:
           cd /tmp/dist-macos-$ARCH
           cp libusb_path bin
           
-          for file in *; do
+          for file in bin/*; do
             if [ -f "$file" ] && [ -x "$file" ]; then
               if otool -L "$file" 2>/dev/null | grep -q "libusb-1.0.0.dylib"; then
                 echo "修改 $file ..."
