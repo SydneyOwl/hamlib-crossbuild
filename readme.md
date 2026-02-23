@@ -10,10 +10,9 @@ Linux binaries are built within an isolated Docker environment utilizing the Deb
 Debian 9 ships with GLIBC 2.24, ensuring compatibility with the vast majority of current Linux distributions. 
 This version represents a conservative baseline that maximizes backward compatibility. Newer GLIBC versions maintain backward compatibility, 
 but older versions cannot run binaries built against newer GLIBC.
+Static linking(--disable-shared --enable-static) is enabled when building binaries - This produces self-contained binaries with all dependencies embedded, so it should eliminates runtime dependency conflicts on target systems.
 
 macOS binaries are built using macOS 15.
-
-Static linking(--disable-shared --enable-static) is enabled when building binaries - This produces self-contained binaries with all dependencies embedded, so it should eliminates runtime dependency conflicts on target systems.
 
 ## License
 The build scripts and automation code in this repository are Unlicensed(The Unlicense). Hamlib itself is licensed under various open source licenses (GPL, LGPL). Please refer to the official Hamlib repository for details.

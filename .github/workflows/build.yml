@@ -176,9 +176,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install automake autoconf libtool pkg-config cmake
-          brew install libusb libusb-compat
-          brew install libomp
+          brew install automake autoconf libtool pkg-config cmake libusb libusb-compat libomp
 
       - name: Clone Hamlib source
         env:
@@ -196,6 +194,9 @@ jobs:
           DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
         run: |
           echo "=====START BUILDING FOR macOS $ARCH"
+
+          libusb_path=$(brew list libusb | grep libusb-1.0.0.dylib)
+          echo $libusb_path
           
           # Create build directory
           mkdir -p /tmp/build-macos-$ARCH
@@ -220,6 +221,18 @@ jobs:
           
           # Package
           cd /tmp/dist-macos-$ARCH
+          cp $libusb_path bin
+          
+          for file in bin/*; do
+            if [ -f "$file" ] && [ -x "$file" ]; then
+              if otool -L "$file" 2>/dev/null | grep -q "libusb-1.0.0.dylib"; then
+                echo "--> $file ..."
+                install_name_tool -change "/usr/local/opt/libusb/lib/libusb-1.0.0.dylib" \
+                "@executable_path/libusb-1.0.0.dylib" "$file"
+              fi
+            fi
+          done
+          
           chmod +x bin/*
           zip -r Hamlib-macos-$ARCH-$TAG.zip *
           
