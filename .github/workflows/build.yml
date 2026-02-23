@@ -176,8 +176,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew uninstall coreutils
-          brew uninstall binutils
           brew install automake autoconf libtool pkg-config cmake libusb libusb-compat libomp
 
       - name: Clone Hamlib source
