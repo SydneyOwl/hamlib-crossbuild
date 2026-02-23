@@ -176,6 +176,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          brew uninstall binutils
           brew install automake autoconf libtool pkg-config cmake libusb libusb-compat libomp
 
       - name: Clone Hamlib source
@@ -193,8 +194,6 @@ jobs:
           TARGET: ${{ matrix.target }}
           DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
         run: |
-          export AR=/usr/bin/ar
-          
           echo "=====START BUILDING FOR macOS $ARCH"
           
           libusb_path=$(brew list libusb | grep libusb-1.0.a |  head -1)
@@ -220,7 +219,7 @@ jobs:
             LIBUSB_LIBS="$libusb_path"
           
           # Build and install
-          make AR=/usr/bin/ar -j$(sysctl -n hw.ncpu) all
+          make -j$(sysctl -n hw.ncpu) all
           make install-strip DESTDIR=""
           
           # Package
