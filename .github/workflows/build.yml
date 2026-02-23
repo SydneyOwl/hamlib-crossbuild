@@ -179,7 +179,6 @@ jobs:
           brew install automake autoconf libtool pkg-config cmake
           brew install libusb libusb-compat
           brew install libomp
-          brew list libusb
 
       - name: Clone Hamlib source
         env:
@@ -198,6 +197,10 @@ jobs:
         run: |
           echo "=====START BUILDING FOR macOS $ARCH"
           
+          libusb_path=$(brew list libusb | grep libusb-1.0.a |  head -1)
+          
+          echo $libusb_path
+          
           # Create build directory
           mkdir -p /tmp/build-macos-$ARCH
           mkdir -p /tmp/dist-macos-$ARCH
@@ -214,8 +217,7 @@ jobs:
             --disable-shared \
             --enable-static \
             --without-cxx-binding \
-            CFLAGS="-g -O2 -fPIC -fdata-sections -ffunction-sections" \
-            LDFLAGS="-Wl,--gc-sections"
+            LIBUSB_LIBS="$libusb_path"
           
           # Build and install
           make -j$(sysctl -n hw.ncpu) all
