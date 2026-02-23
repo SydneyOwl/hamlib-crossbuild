@@ -176,7 +176,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew uninstall binutils
           brew install automake autoconf libtool pkg-config cmake libusb libusb-compat libomp
 
       - name: Clone Hamlib source
@@ -195,10 +194,12 @@ jobs:
           DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
         run: |
           echo "=====START BUILDING FOR macOS $ARCH"
-          
-          libusb_path=$(brew list libusb | grep libusb-1.0.a |  head -1)
+
+          libusb_path=$(brew list libusb | grep libusb-1.0.a | head -1)
           
           echo $libusb_path
+          
+          file $libusb_path
           
           # Create build directory
           mkdir -p /tmp/build-macos-$ARCH
@@ -217,6 +218,8 @@ jobs:
             --enable-static \
             --without-cxx-binding \
             LIBUSB_LIBS="$libusb_path"
+          
+          export PATH="/usr/bin:/bin:/usr/sbin:/sbin"
           
           # Build and install
           make -j$(sysctl -n hw.ncpu) all
