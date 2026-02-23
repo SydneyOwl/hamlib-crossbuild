@@ -179,6 +179,7 @@ jobs:
           brew install automake autoconf libtool pkg-config cmake
           brew install libusb libusb-compat
           brew install libomp
+          brew list libusb
 
       - name: Clone Hamlib source
         env:
@@ -212,7 +213,9 @@ jobs:
             --host=$TARGET \
             --disable-shared \
             --enable-static \
-            --without-cxx-binding
+            --without-cxx-binding \
+            CFLAGS="-g -O2 -fPIC -fdata-sections -ffunction-sections" \
+            LDFLAGS="-Wl,--gc-sections"
           
           # Build and install
           make -j$(sysctl -n hw.ncpu) all
