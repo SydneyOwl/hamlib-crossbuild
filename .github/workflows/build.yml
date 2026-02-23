@@ -203,6 +203,8 @@ jobs:
           
           file $libusb_path
           
+          which ar
+          
           # Create build directory
           mkdir -p /tmp/build-macos-$ARCH
           mkdir -p /tmp/dist-macos-$ARCH
